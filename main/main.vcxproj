@@ -125,13 +125,27 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="AppState.h" />
+    <ClInclude Include="Dialogs.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="ImageManager.h" />
     <ClInclude Include="main.h" />
+    <ClInclude Include="RendererGDI.h" />
     <ClInclude Include="Resource.h" />
+    <ClInclude Include="StegEngine.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AppState.cpp" />
+    <ClCompile Include="Dialogs.cpp" />
+    <ClCompile Include="Dialogscpp.cpp" />
+    <ClCompile Include="ImageManager.cpp" />
+    <ClCompile Include="ImageManagercpp.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="RendererGDI.cpp" />
+    <ClCompile Include="RenderGDIcpp.cpp" />
+    <ClCompile Include="StegEngine.cpp" />
+    <ClCompile Include="StegEnginecpp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="main.rc" />
