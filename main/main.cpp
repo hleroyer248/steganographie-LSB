@@ -10,12 +10,14 @@ static void DoOpen(HWND hWnd);
 static void DoSave(HWND hWnd);
 static void DoEmbed(HWND hWnd);
 static void DoExtract(HWND hWnd);
+static void ResetView(HWND hWnd);
 
 static HMENU CreateMenuBar()
 {
     HMENU m = CreateMenu();
     HMENU f = CreateMenu();
     HMENU s = CreateMenu();
+    HMENU v = CreateMenu();
 
     AppendMenuA(f, MF_STRING, 1001, "Ouvrir");
     AppendMenuA(f, MF_STRING, 1002, "Enregistrer sous");
@@ -24,24 +26,117 @@ static HMENU CreateMenuBar()
     AppendMenuA(s, MF_STRING, 1004, "Inserer message");
     AppendMenuA(s, MF_STRING, 1005, "Extraire message");
 
+    AppendMenuA(v, MF_STRING, 1006, "Zoom 100%");
+
     AppendMenuA(m, MF_POPUP, (UINT_PTR)f, "Fichier");
     AppendMenuA(m, MF_POPUP, (UINT_PTR)s, "Steganographie");
+    AppendMenuA(m, MF_POPUP, (UINT_PTR)v, "Affichage");
+
     return m;
+}
+
+static void CenterImageInWindow(HWND hWnd)
+{
+    if (!g_app.img.hasImage) return;
+
+    RECT rc;
+    GetClientRect(hWnd, &rc);
+
+    int winW = rc.right - rc.left;
+    int winH = rc.bottom - rc.top;
+
+    int drawW = (int)(g_app.img.width * g_app.zoom);
+    int drawH = (int)(g_app.img.height * g_app.zoom);
+
+    g_app.offsetX = (winW - drawW) / 2;
+    g_app.offsetY = (winH - drawH) / 2;
 }
 
 static LRESULT CALLBACK MainProc(HWND hWnd, UINT msg, WPARAM w, LPARAM l)
 {
     switch (msg)
     {
-    case WM_COMMAND:
-        switch (LOWORD(w))
+    case WM_MOUSEWHEEL:
+    {
+        POINT p;
+        GetCursorPos(&p);
+        ScreenToClient(hWnd, &p);
+
+        float oldZoom = g_app.zoom;
+
+        short d = GET_WHEEL_DELTA_WPARAM(w);
+        if (d > 0) g_app.zoom *= 1.1f;
+        else
         {
-        case 1001: DoOpen(hWnd); return 0;
-        case 1002: DoSave(hWnd); return 0;
-        case 1003: PostQuitMessage(0); return 0;
-        case 1004: DoEmbed(hWnd); return 0;
-        case 1005: DoExtract(hWnd); return 0;
+            g_app.zoom *= 0.9f;
+            if (g_app.zoom < 0.1f) g_app.zoom = 0.1f;
         }
+
+        float oz = oldZoom;
+        float nz = g_app.zoom;
+
+        float ix = (p.x - g_app.offsetX) / oz;
+        float iy = (p.y - g_app.offsetY) / oz;
+
+        g_app.offsetX = (int)(p.x - ix * nz);
+        g_app.offsetY = (int)(p.y - iy * nz);
+
+        InvalidateRect(hWnd, 0, TRUE);
+        return 0;
+    }
+
+    case WM_KEYDOWN:
+        if (w == VK_ADD || w == VK_OEM_PLUS)
+        {
+            POINT p;
+            GetCursorPos(&p);
+            ScreenToClient(hWnd, &p);
+
+            float oldZoom = g_app.zoom;
+            g_app.zoom *= 1.1f;
+
+            float oz = oldZoom;
+            float nz = g_app.zoom;
+
+            float ix = (p.x - g_app.offsetX) / oz;
+            float iy = (p.y - g_app.offsetY) / oz;
+
+            g_app.offsetX = (int)(p.x - ix * nz);
+            g_app.offsetY = (int)(p.y - iy * nz);
+
+            InvalidateRect(hWnd, 0, TRUE);
+            return 0;
+        }
+
+        if (w == VK_SUBTRACT || w == VK_OEM_MINUS)
+        {
+            POINT p;
+            GetCursorPos(&p);
+            ScreenToClient(hWnd, &p);
+
+            float oldZoom = g_app.zoom;
+            g_app.zoom *= 0.9f;
+            if (g_app.zoom < 0.1f) g_app.zoom = 0.1f;
+
+            float oz = oldZoom;
+            float nz = g_app.zoom;
+
+            float ix = (p.x - g_app.offsetX) / oz;
+            float iy = (p.y - g_app.offsetY) / oz;
+
+            g_app.offsetX = (int)(p.x - ix * nz);
+            g_app.offsetY = (int)(p.y - iy * nz);
+
+            InvalidateRect(hWnd, 0, TRUE);
+            return 0;
+        }
+
+        if (w == VK_ESCAPE)
+        {
+            PostQuitMessage(0);
+            return 0;
+        }
+
         break;
 
     case WM_PAINT:
@@ -56,8 +151,21 @@ static LRESULT CALLBACK MainProc(HWND hWnd, UINT msg, WPARAM w, LPARAM l)
     }
 
     case WM_SIZE:
+        CenterImageInWindow(hWnd);
         InvalidateRect(hWnd, 0, TRUE);
         return 0;
+
+    case WM_COMMAND:
+        switch (LOWORD(w))
+        {
+        case 1001: DoOpen(hWnd); return 0;
+        case 1002: DoSave(hWnd); return 0;
+        case 1003: PostQuitMessage(0); return 0;
+        case 1004: DoEmbed(hWnd); return 0;
+        case 1005: DoExtract(hWnd); return 0;
+        case 1006: ResetView(hWnd); return 0;
+        }
+        break;
 
     case WM_DESTROY:
         PostQuitMessage(0);
@@ -82,7 +190,15 @@ static void DoOpen(HWND hWnd)
     if (GetOpenFileNameA(&of))
     {
         if (g_app.img.LoadBMP(file))
+        {
+            g_app.zoom = 1.0f;
+            CenterImageInWindow(hWnd);
             InvalidateRect(hWnd, 0, TRUE);
+        }
+        else
+        {
+            MessageBoxA(hWnd, "Erreur ouverture", "Erreur", MB_OK);
+        }
     }
 }
 
@@ -114,12 +230,11 @@ static void DoSave(HWND hWnd)
 
     if (GetSaveFileNameA(&of))
     {
-        bool hasExt = false;
+        bool ext = false;
         for (int i = 0; file[i]; i++)
-        {
-            if (file[i] == '.') hasExt = true;
-        }
-        if (!hasExt) AddExtBmp(file);
+            if (file[i] == '.') ext = true;
+
+        if (!ext) AddExtBmp(file);
 
         g_app.img.SaveBMP(file);
     }
@@ -153,6 +268,13 @@ static void DoExtract(HWND hWnd)
     ShowExtract(hWnd, out);
 }
 
+static void ResetView(HWND hWnd)
+{
+    g_app.zoom = 1.0f;
+    CenterImageInWindow(hWnd);
+    InvalidateRect(hWnd, 0, TRUE);
+}
+
 int APIENTRY WinMain(HINSTANCE h, HINSTANCE, LPSTR, int cmd)
 {
     const char* cls = "MainWndSteg";
@@ -168,18 +290,33 @@ int APIENTRY WinMain(HINSTANCE h, HINSTANCE, LPSTR, int cmd)
 
     RegisterClassExA(&wc);
 
+    int sw = GetSystemMetrics(SM_CXSCREEN);
+    int sh = GetSystemMetrics(SM_CYSCREEN);
+
     HWND w = CreateWindowExA(
-        0, cls, "Steganographie BMP",
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT,
-        800, 600,
-        0, 0, h, 0
+        0,
+        cls,
+        "Steganographie BMP",
+        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+        0,
+        0,
+        sw,
+        sh,
+        0,
+        0,
+        h,
+        0
     );
 
     g_app.mainWnd = w;
+    g_app.zoom = 1.0f;
+    g_app.offsetX = 0;
+    g_app.offsetY = 0;
 
     SetMenu(w, CreateMenuBar());
-    ShowWindow(w, cmd);
+    MoveWindow(w, 0, 0, sw, sh, TRUE);
+
+    ShowWindow(w, SW_SHOWMAXIMIZED);
     UpdateWindow(w);
 
     MSG msg;

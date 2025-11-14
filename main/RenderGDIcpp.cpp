@@ -1,8 +1,20 @@
 #include "RendererGDI.h"
+#include "AppState.h"
+
+extern AppState g_app;
 
 void RendererGDI::Draw(HDC hdc, RECT rc, const ImageManager& img)
 {
     if (!img.hasImage) return;
+
+    int winW = rc.right - rc.left;
+    int winH = rc.bottom - rc.top;
+
+    int drawW = (int)(img.width * g_app.zoom);
+    int drawH = (int)(img.height * g_app.zoom);
+
+    int x = g_app.offsetX;
+    int y = g_app.offsetY;
 
     BITMAPINFO bmi;
     ZeroMemory(&bmi, sizeof(bmi));
@@ -13,12 +25,12 @@ void RendererGDI::Draw(HDC hdc, RECT rc, const ImageManager& img)
     bmi.bmiHeader.biBitCount = 32;
     bmi.bmiHeader.biCompression = BI_RGB;
 
-    int w = rc.right - rc.left;
-    int h = rc.bottom - rc.top;
+    SetStretchBltMode(hdc, HALFTONE);
+    SetBrushOrgEx(hdc, 0, 0, 0);
 
     StretchDIBits(
         hdc,
-        0, 0, w, h,
+        x, y, drawW, drawH,
         0, 0, img.width, img.height,
         img.pixels.data(),
         &bmi,
