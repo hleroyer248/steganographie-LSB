@@ -1,6 +1,6 @@
 #include "StegEngine.h"
 
-bool StegEngine::EmbedLSB(ImageManager& img, const std::string& txt)
+bool StegEngine::EmbedLSB(ImageManager& img, const std::string& txt) //dissimuler le message dans l'image
 {
     if (!img.hasImage) return false;
 

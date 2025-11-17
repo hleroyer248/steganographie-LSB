@@ -4,9 +4,9 @@
 #include "ImageManager.h"
 #include <windows.h>
 
-extern AppState g_app;
+extern AppState g_app; // recupere les donnes de AppState
 
-static HWND hEditEmbed = 0;
+static HWND hEditEmbed = 0; 
 
 void ShowEmbed(HWND parent)
 {

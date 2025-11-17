@@ -11,4 +11,4 @@ struct AppState
     int offsetY = 0;
 };
 
-extern AppState g_app; // aces global et partager 
+extern AppState g_app; // aces global et partager, utiliser dans Dialogs.cpp et RenderGDI.cpp

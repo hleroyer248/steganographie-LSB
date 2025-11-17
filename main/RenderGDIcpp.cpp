@@ -1,7 +1,7 @@
 #include "RendererGDI.h"
 #include "AppState.h"
 
-extern AppState g_app;
+extern AppState g_app; // recupere les donnes de AppState
 
 void RendererGDI::Draw(HDC hdc, RECT rc, const ImageManager& img)
 {

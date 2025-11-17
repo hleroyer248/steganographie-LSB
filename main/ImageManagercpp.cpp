@@ -1,67 +1,71 @@
 #include "ImageManager.h"
 #include <windows.h>
 
-ImageManager::ImageManager() : width(0), height(0), hasImage(false)
+ImageManager::ImageManager() : width(0), height(0), hasImage(false) //initialisation des valeurs (constructeur)
 {
 }
+// suite de condition a l'ouverture de l'image
 
 bool ImageManager::LoadBMP(const char* path)
 {
     HANDLE f = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-    if (f == INVALID_HANDLE_VALUE) return false;
+    if (f == INVALID_HANDLE_VALUE) return false; // ouvre un fichier BMP avec droit d'acces standard
 
     DWORD br = 0;
     BITMAPFILEHEADER bmf;
-    if (!ReadFile(f, &bmf, sizeof(bmf), &br, 0) || br != sizeof(bmf))
+    if (!ReadFile(f, &bmf, sizeof(bmf), &br, 0) || br != sizeof(bmf)) // lit le fichier , si il ne peux pas lire(ou lit partiellement) alors le fichier se ferme (CloseHandle)
     {
         CloseHandle(f);
         return false;
     }
-    if (bmf.bfType != 0x4D42)
+    if (bmf.bfType != 0x4D42) //bfType doit être 0x4D42, ce qui correspond à "BM" en ASCII. 
     {
         CloseHandle(f);
         return false;
     }
 
     BITMAPINFOHEADER bih;
-    if (!ReadFile(f, &bih, sizeof(bih), &br, 0) || br != sizeof(bih))
+    if (!ReadFile(f, &bih, sizeof(bih), &br, 0) || br != sizeof(bih)) // lecture complete de la structure du fichier BMP (bih = BIT DEPTH)
     {
         CloseHandle(f);
         return false;
     }
 
-    if (bih.biCompression != BI_RGB)
+    if (bih.biCompression != BI_RGB)  // aucune compression
     {
         CloseHandle(f);
         return false;
     }
-    if (bih.biBitCount != 24 && bih.biBitCount != 32)
+    if (bih.biBitCount != 24 && bih.biBitCount != 32) // verifie que l'image est bien en 24 bits/pixel (RGB) ou 32 bits/pixel (BGRA)
     {
         CloseHandle(f);
         return false;
     }
 
-    int w = bih.biWidth;
+    //coordonee
+    int w = bih.biWidth; 
     int h = bih.biHeight > 0 ? bih.biHeight : -bih.biHeight;
 
-    if (w <= 0 || h <= 0)
+    if (w <= 0 || h <= 0) // verifie que longueur et largeur soit positif
     {
         CloseHandle(f);
         return false;
     }
 
+    //On fixe les champs membres width et height de l’objet.
     width = w;
     height = h;
 
-    SetFilePointer(f, bmf.bfOffBits, 0, FILE_BEGIN);
+    //Positionnement du curseur sur les données pixels
+    SetFilePointer(f, bmf.bfOffBits, 0, FILE_BEGIN); // offset dans le fichier à partir duquel commencent réellement les pixels (offset = déplacement en mémoire)
 
-    int bpp = bih.biBitCount / 8;
-    int rowRaw = width * bpp;
-    int pad = (bpp == 3) ? ((4 - (rowRaw % 4)) & 3) : 0;
-    int stride = rowRaw + pad;
+    int bpp = bih.biBitCount / 8; // bpp = bytes par pixel 
+    int rowRaw = width * bpp; // nombre d’octets réels pour les pixels sur une ligne 
+    int pad = (bpp == 3) ? ((4 - (rowRaw % 4)) & 3) : 0;  // alllignement de la ligne sur 4octets ((bpp == 3) = fichier BMP 24bits
+    int stride = rowRaw + pad; // taille total de chaque lignes du fichier.
 
-    const int totalSize = stride * height;
-    std::vector<unsigned char> src;
+    const int totalSize = stride * height; 
+    std::vector<unsigned char> src;           // lecture de tout le bloc de pixels dans un buffer temporaire (src)
     src.resize(totalSize);
 
     if (!ReadFile(f, src.data(), (DWORD)totalSize, &br, 0) || br != (DWORD)totalSize)
