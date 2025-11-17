@@ -14,10 +14,10 @@ static void ResetView(HWND hWnd);
 
 static HMENU CreateMenuBar()
 {
-    HMENU m = CreateMenu();
-    HMENU f = CreateMenu();
-    HMENU s = CreateMenu();
-    HMENU v = CreateMenu();
+    HMENU m = CreateMenu(); // menu
+    HMENU f = CreateMenu(); // fichier
+    HMENU s = CreateMenu(); // stéganographie
+    HMENU a = CreateMenu(); // affichage
 
     AppendMenuA(f, MF_STRING, 1001, "Ouvrir");
     AppendMenuA(f, MF_STRING, 1002, "Enregistrer sous");
@@ -26,67 +26,71 @@ static HMENU CreateMenuBar()
     AppendMenuA(s, MF_STRING, 1004, "Inserer message");
     AppendMenuA(s, MF_STRING, 1005, "Extraire message");
 
-    AppendMenuA(v, MF_STRING, 1006, "Zoom 100%");
+    AppendMenuA(a, MF_STRING, 1006, "Zoom 100%");
 
     AppendMenuA(m, MF_POPUP, (UINT_PTR)f, "Fichier");
     AppendMenuA(m, MF_POPUP, (UINT_PTR)s, "Steganographie");
-    AppendMenuA(m, MF_POPUP, (UINT_PTR)v, "Affichage");
+    AppendMenuA(m, MF_POPUP, (UINT_PTR)a, "Affichage");
 
-    return m;
+    return m; 
 }
 
-static void CenterImageInWindow(HWND hWnd)
+static void CenterImageInWindow(HWND hWnd) // placer l'image au centre de la fenetre
 {
     if (!g_app.img.hasImage) return;
 
     RECT rc;
     GetClientRect(hWnd, &rc);
-
+    //taille de la fenetre 
     int winW = rc.right - rc.left;
     int winH = rc.bottom - rc.top;
 
+    //calcul de la taille afficher de l'image
     int drawW = (int)(g_app.img.width * g_app.zoom);
     int drawH = (int)(g_app.img.height * g_app.zoom);
 
+    // calcul pour centrer
     g_app.offsetX = (winW - drawW) / 2;
     g_app.offsetY = (winH - drawH) / 2;
 }
 
-static LRESULT CALLBACK MainProc(HWND hWnd, UINT msg, WPARAM w, LPARAM l)
+static LRESULT CALLBACK MainProc(HWND hWnd, UINT msg, WPARAM w, LPARAM l) // récupère les messages envoyer a la fenetre
 {
     switch (msg)
     {
-    case WM_MOUSEWHEEL:
+    case WM_MOUSEWHEEL: // zoom centrée sur la souris
     {
         POINT p;
         GetCursorPos(&p);
         ScreenToClient(hWnd, &p);
 
-        float oldZoom = g_app.zoom;
+        float oldZoom = g_app.zoom; // conservation du zoom initiale
 
         short d = GET_WHEEL_DELTA_WPARAM(w);
-        if (d > 0) g_app.zoom *= 1.1f;
+        if (d > 0) g_app.zoom *= 1.1f; // si vers le haut alors on augmente
         else
         {
-            g_app.zoom *= 0.9f;
+            g_app.zoom *= 0.9f; // vers le bas, on diminue
             if (g_app.zoom < 0.1f) g_app.zoom = 0.1f;
         }
 
         float oz = oldZoom;
         float nz = g_app.zoom;
 
+        //calcul des coordonée avant le zoom
         float ix = (p.x - g_app.offsetX) / oz;
         float iy = (p.y - g_app.offsetY) / oz;
 
+        //On recalcule les offsets pour que ce même point(ix, iy) reste sous la souris après zoom
         g_app.offsetX = (int)(p.x - ix * nz);
         g_app.offsetY = (int)(p.y - iy * nz);
 
-        InvalidateRect(hWnd, 0, TRUE);
+        InvalidateRect(hWnd, 0, TRUE); // invalide la fenetre acutuelle pour la redessiner.
         return 0;
     }
-
-    case WM_KEYDOWN:
-        if (w == VK_ADD || w == VK_OEM_PLUS)
+     
+    case WM_KEYDOWN: // zoom avec clavier
+        if (w == VK_ADD || w == VK_OEM_PLUS) // si utilisateur utilise "+"
         {
             POINT p;
             GetCursorPos(&p);
@@ -108,7 +112,7 @@ static LRESULT CALLBACK MainProc(HWND hWnd, UINT msg, WPARAM w, LPARAM l)
             return 0;
         }
 
-        if (w == VK_SUBTRACT || w == VK_OEM_MINUS)
+        if (w == VK_SUBTRACT || w == VK_OEM_MINUS) // si utilisateur utilise "-"
         {
             POINT p;
             GetCursorPos(&p);
@@ -131,7 +135,7 @@ static LRESULT CALLBACK MainProc(HWND hWnd, UINT msg, WPARAM w, LPARAM l)
             return 0;
         }
 
-        if (w == VK_ESCAPE)
+        if (w == VK_ESCAPE) // si utilisateur utilise "echap"
         {
             PostQuitMessage(0);
             return 0;
