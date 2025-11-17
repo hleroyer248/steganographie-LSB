@@ -30,21 +30,41 @@ bool ImageManager::LoadBMP(const char* path)
         return false;
     }
 
-    if (bih.biCompression != BI_RGB) { CloseHandle(f); return false; }
-    if (bih.biBitCount != 24 && bih.biBitCount != 32) { CloseHandle(f); return false; }
+    if (bih.biCompression != BI_RGB)
+    {
+        CloseHandle(f);
+        return false;
+    }
+    if (bih.biBitCount != 24 && bih.biBitCount != 32)
+    {
+        CloseHandle(f);
+        return false;
+    }
 
-    width = bih.biWidth;
-    height = bih.biHeight > 0 ? bih.biHeight : -bih.biHeight;
+    int w = bih.biWidth;
+    int h = bih.biHeight > 0 ? bih.biHeight : -bih.biHeight;
+
+    if (w <= 0 || h <= 0)
+    {
+        CloseHandle(f);
+        return false;
+    }
+
+    width = w;
+    height = h;
 
     SetFilePointer(f, bmf.bfOffBits, 0, FILE_BEGIN);
 
     int bpp = bih.biBitCount / 8;
     int rowRaw = width * bpp;
-    int pad = (bpp == 3 ? (4 - (rowRaw % 4)) % 4 : 0);
+    int pad = (bpp == 3) ? ((4 - (rowRaw % 4)) & 3) : 0;
     int stride = rowRaw + pad;
 
-    std::vector<unsigned char> src(stride * height);
-    if (!ReadFile(f, src.data(), (DWORD)src.size(), &br, 0) || br != src.size())
+    const int totalSize = stride * height;
+    std::vector<unsigned char> src;
+    src.resize(totalSize);
+
+    if (!ReadFile(f, src.data(), (DWORD)totalSize, &br, 0) || br != (DWORD)totalSize)
     {
         CloseHandle(f);
         return false;
@@ -52,27 +72,40 @@ bool ImageManager::LoadBMP(const char* path)
 
     CloseHandle(f);
 
-    pixels.assign(width * height * 4, 255);
-    bool bottom = bih.biHeight > 0;
+    const int pixCount = width * height;
+    pixels.clear();
+    pixels.resize(pixCount * 4);
 
-    for (int y = 0; y < height; y++)
+    const bool bottom = bih.biHeight > 0;
+
+    for (int y = 0; y < height; ++y)
     {
         int sy = bottom ? (height - 1 - y) : y;
-        unsigned char* row = src.data() + sy * stride;
-        for (int x = 0; x < width; x++)
+        const unsigned char* row = src.data() + sy * stride;
+        int dstIndex = y * width * 4;
+
+        if (bpp == 3)
         {
-            int di = (y * width + x) * 4;
-            if (bpp == 3)
+            for (int x = 0; x < width; ++x)
             {
-                pixels[di] = row[x * 3];
-                pixels[di + 1] = row[x * 3 + 1];
-                pixels[di + 2] = row[x * 3 + 2];
+                const int s = x * 3;
+                pixels[dstIndex + 0] = row[s + 0];
+                pixels[dstIndex + 1] = row[s + 1];
+                pixels[dstIndex + 2] = row[s + 2];
+                pixels[dstIndex + 3] = 255;
+                dstIndex += 4;
             }
-            else
+        }
+        else
+        {
+            for (int x = 0; x < width; ++x)
             {
-                pixels[di] = row[x * 4];
-                pixels[di + 1] = row[x * 4 + 1];
-                pixels[di + 2] = row[x * 4 + 2];
+                const int s = x * 4;
+                pixels[dstIndex + 0] = row[s + 0];
+                pixels[dstIndex + 1] = row[s + 1];
+                pixels[dstIndex + 2] = row[s + 2];
+                pixels[dstIndex + 3] = row[s + 3];
+                dstIndex += 4;
             }
         }
     }
@@ -83,43 +116,56 @@ bool ImageManager::LoadBMP(const char* path)
 
 bool ImageManager::SaveBMP(const char* path)
 {
-    if (!hasImage) return false;
+    if (!hasImage || width <= 0 || height <= 0) return false;
 
     int row = width * 3;
-    int pad = (4 - (row % 4)) % 4;
+    int pad = (4 - (row % 4)) & 3;
     int stride = row + pad;
     int size = stride * height;
 
     BITMAPFILEHEADER bmf;
     BITMAPINFOHEADER bih;
-    ZeroMemory(&bmf, sizeof(bmf));
-    ZeroMemory(&bih, sizeof(bih));
 
     bmf.bfType = 0x4D42;
-    bmf.bfOffBits = sizeof(bmf) + sizeof(bih);
+    bmf.bfOffBits = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
     bmf.bfSize = bmf.bfOffBits + size;
+    bmf.bfReserved1 = 0;
+    bmf.bfReserved2 = 0;
 
-    bih.biSize = sizeof(bih);
+    bih.biSize = sizeof(BITMAPINFOHEADER);
     bih.biWidth = width;
     bih.biHeight = height;
     bih.biPlanes = 1;
     bih.biBitCount = 24;
     bih.biCompression = BI_RGB;
     bih.biSizeImage = size;
+    bih.biXPelsPerMeter = 0;
+    bih.biYPelsPerMeter = 0;
+    bih.biClrUsed = 0;
+    bih.biClrImportant = 0;
 
-    std::vector<unsigned char> out(size, 0);
+    std::vector<unsigned char> out;
+    out.resize(size);
 
-    for (int y = 0; y < height; y++)
+    for (int y = 0; y < height; ++y)
     {
         int sy = height - 1 - y;
-        unsigned char* row = out.data() + y * stride;
+        const unsigned char* srcRow = pixels.data() + sy * width * 4;
+        unsigned char* dstRow = out.data() + y * stride;
 
-        for (int x = 0; x < width; x++)
+        for (int x = 0; x < width; ++x)
         {
-            int si = (sy * width + x) * 4;
-            row[x * 3] = pixels[si];
-            row[x * 3 + 1] = pixels[si + 1];
-            row[x * 3 + 2] = pixels[si + 2];
+            int si = x * 4;
+            int di = x * 3;
+            dstRow[di + 0] = srcRow[si + 0];
+            dstRow[di + 1] = srcRow[si + 1];
+            dstRow[di + 2] = srcRow[si + 2];
+        }
+
+        if (pad)
+        {
+            unsigned char* padPtr = dstRow + row;
+            for (int i = 0; i < pad; ++i) padPtr[i] = 0;
         }
     }
 
@@ -127,11 +173,12 @@ bool ImageManager::SaveBMP(const char* path)
     if (f == INVALID_HANDLE_VALUE) return false;
 
     DWORD bw = 0;
-    bool ok =
+    BOOL ok =
         WriteFile(f, &bmf, sizeof(bmf), &bw, 0) &&
         WriteFile(f, &bih, sizeof(bih), &bw, 0) &&
         WriteFile(f, out.data(), (DWORD)out.size(), &bw, 0);
 
     CloseHandle(f);
-    return ok;
+    return ok ? true : false;
 }
+

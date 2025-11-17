@@ -5,6 +5,6 @@
 class RendererGDI
 {
 public:
-    static void Draw(HDC hdc, RECT rc, const ImageManager& img);
+    static void Draw(HDC hdc, RECT rc, const ImageManager& img); //dessine l'image dans la fenetre
 };
 

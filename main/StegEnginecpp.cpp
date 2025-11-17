@@ -83,3 +83,4 @@ bool StegEngine::ExtractLSB(const ImageManager& img, std::string& out)
     out.assign((char*)&b[8], (char*)&b[8 + len]);
     return true;
 }
+ 
